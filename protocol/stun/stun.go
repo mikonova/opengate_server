@@ -3,7 +3,6 @@ package stun
 import (
 	"encoding/binary"
 	"errors"
-	"math/rand/v2"
 	"net"
 	"slices"
 	"time"
@@ -17,7 +16,7 @@ type AddrInfo struct {
 	isInitialised bool
 	IsIPv6        bool
 	Port          uint16
-	Address       net.IP
+	Address       [16]byte
 }
 
 type attrInfo struct {
@@ -26,7 +25,19 @@ type attrInfo struct {
 	FullLength uint16
 }
 
-var magicCookie []byte = []byte{0x21, 0x12, 0xA4, 0x42}
+// readonly
+var magicCookie [4]byte = [4]byte{0x21, 0x12, 0xA4, 0x42}
+
+// constant allocations
+var (
+	errAlternate      = errors.New("[ERR] try alternate STUN server: ")
+	errMalformed      = errors.New("[ERR] malformed STUN request: ")
+	errTempServer     = errors.New("[ERR] temporary server error: ")
+	errUnexpected     = errors.New("[ERR] unexpected error: ")
+	errUnmatchingResp = errors.New("[ERR] unmatching STUN response type")
+	errTrID           = errors.New("[ERR] unmatching STUN transactionID")
+	errCookie         = errors.New("[ERR] unmatching STUN magic cookie")
+)
 
 func StunDial() AddrInfo {
 	for {
@@ -39,49 +50,44 @@ func StunDial() AddrInfo {
 
 func dialingLoop() (info AddrInfo) {
 	var conn net.Conn
-	transactionID := make([]byte, 12)
-	inputBuf := make([]byte, 4096)
-	buf := []byte{
+	transactionBufArr := [12]byte{}
+	inputbufArr := [4096]byte{}
+	outputBufArr := [20]byte{}
+
+	transactionID := transactionBufArr[0:0]
+	inputBuf := inputbufArr[0:0]
+	outputBuf := outputBufArr[0:0]
+
+	outputBuf = append(outputBuf,
 		0x00, 0x01, // binding request
 		0x00, 0x00, // message length
-	}
-	buf = append(buf, magicCookie...)
+	)
+	outputBuf = append(outputBuf, magicCookie[:]...)
 
-	var seed []byte
-	for try := range 4 {
-		timeBin, err := time.Now().MarshalBinary()
-		if err == nil {
-			seed = timeBin
-			break
-		}
-		println("[ERR] error getting the seed, retrying")
-		if try == 3 {
-			panic("[ERR] couldnt get time/marshall it to bytes")
-		}
-	}
-	chacha8 := rand.NewChaCha8([32]byte())
-	_, err := rand.Read(transactionID)
-	if err != nil {
-		panic(err)
-	}
+	var err error
+	seedBuf := [32]byte{}
+	seed := seedBuf[0:0]
+	timeNano := time.Now().UnixNano()
+	binary.LittleEndian.AppendUint64(seed, uint64(timeNano))
+	binary.LittleEndian.AppendUint32(seed, uint32(timeNano))
 
-	buf = append(buf, transactionID...)
+	outputBuf = append(outputBuf, transactionID...)
 
 	for _, v := range stunlist.ServerList {
 	RETRY:
 		conn, err = net.Dial("udp", v)
 		if err != nil {
-			println("[WARN] " + "dialing error on server \"" + v + "\", switching server")
+			println("[WARN] dialing error on server \"", v, "\", switching server")
 			continue
 		}
-		conn.SetDeadline(time.Now().Add(time.Second * 3))
-		if _, err := conn.Write(buf); err != nil {
-			println("[WARN] " + "writing timeout on server \"" + v + "\", switching server")
+		conn.SetDeadline(time.Now().Add(time.Second * 5))
+		if _, err := conn.Write(outputBuf); err != nil {
+			println("[WARN] writing timeout on server \"", v, "\", switching server")
 			conn.Close()
 			continue
 		}
 		if _, err := conn.Read(inputBuf); err != nil {
-			println("[WARN] " + "reading timeout on server \"" + v + "\", switching server")
+			println("[WARN] reading timeout on server \"", v, "\", switching server")
 			conn.Close()
 			continue
 		}
@@ -122,15 +128,13 @@ func decodeResp(buf []byte, tID []byte) (err error, n int, info AddrInfo) {
 	transactionID := header[8:]
 
 	if n := slices.Compare(transactionID, tID); n != 0 {
-		err = errors.New("[ERR] " + "unmatching STUN transactionID")
-		println(err.Error())
-		return err, sterr.Alternate, info
+		println(errTrID.Error())
+		return errTrID, sterr.Alternate, info
 	}
 
-	if n := slices.Compare(cookie, magicCookie); n != 0 {
-		err = errors.New("[ERR] " + "unmatching STUN magic cookie")
-		println(err.Error())
-		return err, sterr.Alternate, info
+	if n := slices.Compare(cookie, magicCookie[:]); n != 0 {
+		println(errCookie.Error())
+		return errCookie, sterr.Alternate, info
 	}
 
 	for i := 0; i < int(msgLength); {
@@ -175,7 +179,6 @@ func extractArg(argList []byte) (args []byte, argument attrInfo) {
 
 }
 
-// TODO: доделать парсинг IP
 func parseArgument(argument []byte, header []byte, argtype int, tID []byte) (err error, n int, addrinfo AddrInfo) {
 	successResp := []byte{0x01, 0x01}
 	errResp := []byte{0x01, 0x11}
@@ -206,47 +209,47 @@ func parseArgument(argument []byte, header []byte, argtype int, tID []byte) (err
 		declineStatus := class*100 + number
 		switch declineStatus {
 		case 300:
-			err = errors.New("[ERR] " + "try alternate STUN server: ")
-			println(err.Error(), declineStatus, ", reason: ", reason)
-			return err, sterr.Alternate, addrinfo
+			println(errAlternate.Error(), declineStatus, ", reason: ", reason)
+			return errAlternate, sterr.Alternate, addrinfo
 		case 400:
-			err = errors.New("[ERR] " + "malformed STUN request: ")
-			println(err.Error(), declineStatus, ", reason: ", reason)
-			return err, sterr.Other, addrinfo
+			println(errMalformed, declineStatus, ", reason: ", reason)
+			return errMalformed, sterr.Other, addrinfo
 		case 500:
-			err = errors.New("[ERR] " + "temporary server error: ")
-			println(err.Error(), declineStatus, ", reason: ", reason)
-			return err, sterr.Retry, addrinfo
+			println(errTempServer, declineStatus, ", reason: ", reason)
+			return errTempServer, sterr.Retry, addrinfo
 		default:
-			err = errors.New("[ERR] " + "unexpected error: ")
-			println(err.Error(), declineStatus, ", reason: ", reason)
-			return err, sterr.Alternate, addrinfo
+			println(errUnexpected, declineStatus, ", reason: ", reason)
+			return errUnexpected, sterr.Alternate, addrinfo
 		}
 	} else {
-		err = errors.New("[ERR] " + "unmatching STUN response type")
-		//log.Println(err.Error())
-		return err, sterr.Other, addrinfo
+		println(errUnmatchingResp.Error())
+		return errUnmatchingResp, sterr.Other, addrinfo
 	}
 }
 
-func decodeIP(xorMappedAddr []byte, transactionID []byte, fam byte) (bool, net.IP) {
+func decodeIP(xorMappedAddr []byte, transactionID []byte, fam byte) (bool, [16]byte) {
 	if fam == byte(0x02) {
-		ipUnmapped := make([]byte, 16)
-		compositeCookie := append(magicCookie, transactionID...)
+		ipUnmappedArr := [16]byte{}
+		ipUnmapped := ipUnmappedArr[:]
+		compositeCookie := append(magicCookie[:], transactionID...)
 		for key, value := range compositeCookie {
 			ipUnmapped[key] = xorMappedAddr[key] ^ value
 		}
-		ip := net.IP(ipUnmapped)
-		return false, ip
+
+		return false, ipUnmappedArr
 	} else if fam == byte(0x01) {
-		ipUnmapped := make([]byte, 4)
+		ipUnmappedArr := [4]byte{}
+		ipUnmapped := ipUnmappedArr[:]
 		for key, value := range magicCookie {
 			ipUnmapped[key] = xorMappedAddr[key] ^ value
 		}
-		ip := net.IPv4(ipUnmapped[0], ipUnmapped[1], ipUnmapped[2], ipUnmapped[3])
-		return false, ip
+		ipArr := [16]byte{}
+		ip := ipArr[:]
+		ip = net.IPv4(ipUnmapped[0], ipUnmapped[1], ipUnmapped[2], ipUnmapped[3])
+		_ = ip
+		return false, ipArr
 	} else {
-		println("[ERR] " + "unrecognized IP format in STUN response")
+		println("[ERR] unrecognized IP format in STUN response")
 	}
-	return false, nil
+	return false, [16]byte{}
 }

@@ -1,3 +1,5 @@
+//go:build !tests
+
 package main
 
 import (
@@ -52,10 +54,3 @@ func getInput() (output string) {
 	}
 	return output
 }
-
-/* func receiveControl() {
-	for {
-		input, err := machine.Serial.ReadByte()
-	}
-}
-*/
