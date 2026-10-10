@@ -4,6 +4,7 @@ package main
 
 import (
 	"machine"
+	"relayesp/boardio"
 	"relayesp/wifi"
 	"time"
 )
@@ -18,12 +19,12 @@ func main() {
 	time.Sleep(time.Second * 5)
 LOGIN:
 	println("enter wifi SSID")
-	ssid := getInput()
+	ssid := boardio.GetInput()
 	println("enter wifi password")
-	pass := getInput()
+	pass := boardio.GetInput()
 	println("current inputs are: ", ssid, pass)
 	println("proceed (y/n)?[y]")
-	conf := getInput()
+	conf := boardio.GetInput()
 	if conf == "n" {
 		goto LOGIN
 	} else {
@@ -38,19 +39,4 @@ LOGIN:
 	for {
 
 	}
-}
-
-func getInput() (output string) {
-	for {
-		data, err := machine.Serial.ReadByte()
-		if err != nil {
-			continue
-		}
-		if data == '\n' {
-			break
-		} else {
-			output += string(data)
-		}
-	}
-	return output
 }

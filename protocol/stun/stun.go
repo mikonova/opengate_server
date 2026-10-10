@@ -49,13 +49,13 @@ func StunDial() AddrInfo {
 }
 
 func dialingLoop() (info AddrInfo) {
-	var conn net.Conn
+	var conn *net.UDPConn
 	transactionBufArr := [12]byte{}
 	inputbufArr := [4096]byte{}
 	outputBufArr := [20]byte{}
 
 	transactionID := transactionBufArr[0:0]
-	inputBuf := inputbufArr[0:0]
+	inputBuf := inputbufArr[:]
 	outputBuf := outputBufArr[0:0]
 
 	outputBuf = append(outputBuf,
@@ -65,21 +65,29 @@ func dialingLoop() (info AddrInfo) {
 	outputBuf = append(outputBuf, magicCookie[:]...)
 
 	var err error
-	seedBuf := [32]byte{}
-	seed := seedBuf[0:0]
+	var raddr *net.UDPAddr
 	timeNano := time.Now().UnixNano()
-	binary.LittleEndian.AppendUint64(seed, uint64(timeNano))
-	binary.LittleEndian.AppendUint32(seed, uint32(timeNano))
+	transactionID = binary.BigEndian.AppendUint64(transactionID, uint64(timeNano))
+	transactionID = binary.BigEndian.AppendUint32(transactionID, uint32(timeNano))
 
 	outputBuf = append(outputBuf, transactionID...)
 
 	for _, v := range stunlist.ServerList {
 	RETRY:
-		conn, err = net.Dial("udp", v)
+		raddr, err = net.ResolveUDPAddr("udp", v)
 		if err != nil {
-			println("[WARN] dialing error on server \"", v, "\", switching server")
+			println("[WARN] dialing error on server \"", v, "\", switching server. Full report below:")
+			println(err.Error(), "\n---\n")
 			continue
 		}
+		conn, err = net.DialUDP("udp", nil, raddr)
+		if err != nil {
+			println("[WARN] dialing error on server \"", v, "\", switching server")
+			println(err.Error(), "\n---\n")
+
+			continue
+		}
+		println("ssdsds", "\n---\n")
 		conn.SetDeadline(time.Now().Add(time.Second * 5))
 		if _, err := conn.Write(outputBuf); err != nil {
 			println("[WARN] writing timeout on server \"", v, "\", switching server")
@@ -167,7 +175,8 @@ func extractArg(argList []byte) (args []byte, argument attrInfo) {
 		argumentType = stattr.Unimportant
 	}
 
-	padding := 4 - ((4 + argLen) % 4)
+	padding := (4 - (argLen % 4)) % 4
+	//padding := 4 - ((4 + argLen) % 4)
 
 	info := attrInfo{
 		AttrType:   argumentType,
@@ -227,26 +236,28 @@ func parseArgument(argument []byte, header []byte, argtype int, tID []byte) (err
 	}
 }
 
-func decodeIP(xorMappedAddr []byte, transactionID []byte, fam byte) (bool, [16]byte) {
+func decodeIP(xorMappedAddr []byte, transactionID []byte, fam byte) (family bool, ipArr [16]byte) {
 	if fam == byte(0x02) {
 		ipUnmappedArr := [16]byte{}
 		ipUnmapped := ipUnmappedArr[:]
-		compositeCookie := append(magicCookie[:], transactionID...)
+		compositeCookieArr := [16]byte{}
+		compositeCookie := compositeCookieArr[:]
+		compositeCookie = append(compositeCookie, magicCookie[:]...)
+		compositeCookie = append(compositeCookie, transactionID...)
 		for key, value := range compositeCookie {
 			ipUnmapped[key] = xorMappedAddr[key] ^ value
 		}
-
-		return false, ipUnmappedArr
+		copy(ipArr[:], ipUnmapped)
+		return true, ipArr
 	} else if fam == byte(0x01) {
 		ipUnmappedArr := [4]byte{}
 		ipUnmapped := ipUnmappedArr[:]
 		for key, value := range magicCookie {
 			ipUnmapped[key] = xorMappedAddr[key] ^ value
 		}
-		ipArr := [16]byte{}
+		ipArr = [16]byte{}
 		ip := ipArr[:]
-		ip = net.IPv4(ipUnmapped[0], ipUnmapped[1], ipUnmapped[2], ipUnmapped[3])
-		_ = ip
+		copy(ip, net.IPv4(ipUnmapped[0], ipUnmapped[1], ipUnmapped[2], ipUnmapped[3]))
 		return false, ipArr
 	} else {
 		println("[ERR] unrecognized IP format in STUN response")

@@ -3,9 +3,12 @@
 package main
 
 import (
+	"fmt"
 	"relayesp/protocol/stun"
 )
 
 func main() {
-	_ = stun.StunDial()
+	test := stun.StunDial()
+	fmt.Println(test.Address)
+
 }

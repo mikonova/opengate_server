@@ -1,11 +1,9 @@
-github.com/mikonova/relayproto v0.1.9 h1:7QCpfMC6kd3tB2AuotLmmV8VzexV33SoRVEJG7NtQ2k=
-github.com/mikonova/relayproto v0.1.9/go.mod h1:0Tos/cGotYo1kzv/885Pzla1N27APLD6JkLHYJ+KL1o=
-github.com/mikonova/relayproto v0.1.10 h1:ZoxGXKHFF53AdE7Xttnfd0ad67AT3ri5gDksClF+foc=
-github.com/mikonova/relayproto v0.1.10/go.mod h1:0Tos/cGotYo1kzv/885Pzla1N27APLD6JkLHYJ+KL1o=
 github.com/mikonova/relayproto v1.0.1 h1:oR+jNrq7sAKLhPs8ejf6eZoxfTSQRiVKxH9Cgor9D0c=
 github.com/mikonova/relayproto v1.0.1/go.mod h1:ioWSBwG9AB7qgVhQ7dnKzwE4RcsPJtNLM7DmaRfoJd8=
 github.com/soypat/lneto v0.3.2 h1:iUFeRSq2czT7Db6MMOsAnMCBlKCqvIr941zsNf9dcu0=
 github.com/soypat/lneto v0.3.2/go.mod h1:Be5PjwoYukvHFiUXxpYi8+ppH2F/gw/vjGBvFdv+Ti8=
+golang.org/x/net v0.61.0 h1:RR+6j/BTBCrggOLugxa+66R8FvoN6MHlzDlZIbN9YFw=
+golang.org/x/net v0.61.0/go.mod h1:WgDCOTH8iwtB66T4/GfI94AHo/hhdb7Hah9NDseQfiI=
 tinygo.org/x/drivers v0.36.0 h1:F0x342A6GWqh6abtCa57uAxCyz/b9MbGzvIVvIf+gpE=
 tinygo.org/x/drivers v0.36.0/go.mod h1:DQgKyHkB4G6IEOKVTAjApbKnWGwESN91EVJO+nMOE9Y=
 tinygo.org/x/espradio v0.3.0 h1:hJ81KqD3vXH78CIqoDJSDZ+em0E+x/h1ks0LSRZxk+E=

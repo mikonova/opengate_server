@@ -8,3 +8,5 @@ require (
 	tinygo.org/x/drivers v0.36.0
 	tinygo.org/x/espradio v0.3.0
 )
+
+require golang.org/x/net v0.61.0

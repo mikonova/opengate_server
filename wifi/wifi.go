@@ -1,7 +1,7 @@
 package wifi
 
 import (
-	"net"
+	"relayesp/boardio"
 	"time"
 
 	"github.com/soypat/lneto/x/netdev"
@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	ConnChan    chan net.Conn = make(chan net.Conn, 0)
-	ControlChan chan int      = make(chan int, 0)
+	GlobalPort      string = ":10520"
+	isGlobalPortSet bool   = false
 )
 
 func WifiConnect(wifiName, pass string) (err error, address string) {
@@ -40,27 +40,20 @@ func WifiConnect(wifiName, pass string) (err error, address string) {
 	return nil, addr.String()
 }
 
-func Listen(address string) net.Listener {
-	listener, err := net.Listen("udp", address)
-	if err != nil {
-		println("Unable to create a listener")
-		return listener
+func GetAskPort(port string) {
+	if isGlobalPortSet == true {
+		println("[WARN] global port is already set, ignoring")
+		return
 	}
-	return listener
-}
+	isGlobalPortSet = true
+	if port != "" {
+		GlobalPort = port
+		return
+	}
 
-func InitConnHandler(listner net.Listener) {
-	go func() {
-		for {
-			if n := <-ControlChan; n == -1 {
-				return
-			}
-			conn, err := listner.Accept()
-			if err != nil {
-				println("unable to accept connection, retrying")
-			}
-			ConnChan <- conn
-			time.Sleep(time.Second * 5)
-		}
-	}()
+	port = boardio.GetInput()
+	if port == "" {
+		return
+	}
+	GlobalPort = ":" + port
 }
