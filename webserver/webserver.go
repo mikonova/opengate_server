@@ -2,7 +2,6 @@ package webserver
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"relayesp/wifi"
 )
@@ -12,20 +11,10 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
-// var sockChan = chan
-
 func InitServer() {
-	listener, err := net.Listen("tcp", wifi.LocalNetPort)
-	if err != nil {
-		println("[ERR] unable to create listener")
-		return
-	}
 	http.HandleFunc("GET /{$}", generalHandler)
 	http.HandleFunc("POST /api/wifi/setup", parseParams)
-	err = http.Serve(listener, nil)
-	if err != nil {
-		println(err)
-	}
+	go http.ListenAndServe(wifi.LocalNetPort, nil)
 }
 
 func generalHandler(w http.ResponseWriter, r *http.Request) {

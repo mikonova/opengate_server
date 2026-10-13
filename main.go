@@ -26,7 +26,7 @@ func main() {
 	println("ssid: ", wifi.Ssid, " pass: ", wifi.Pass, "port: ", wifi.LocalNetPort)
 	println("[INFO] ip is ", wifi.ApIP)
 	time.Sleep(time.Second)
-	webserver.InitServer()
+	go webserver.InitServer()
 
 	for {
 		time.Sleep(time.Second)
