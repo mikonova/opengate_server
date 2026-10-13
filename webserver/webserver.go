@@ -12,11 +12,17 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
+// var sockChan = chan
+
 func InitServer() {
+	listener, err := net.Listen("tcp", wifi.LocalNetPort)
+	if err != nil {
+		println("[ERR] unable to create listener")
+		return
+	}
 	http.HandleFunc("GET /{$}", generalHandler)
 	http.HandleFunc("POST /api/wifi/setup", parseParams)
-	addr := net.JoinHostPort(wifi.ApIP, wifi.LocalNetPort)
-	err := http.ListenAndServe(addr, nil)
+	err = http.Serve(listener, nil)
 	if err != nil {
 		println(err)
 	}
@@ -34,7 +40,7 @@ func generalHandler(w http.ResponseWriter, r *http.Request) {
 func parseParams(w http.ResponseWriter, r *http.Request) {
 	println("[INFO] credentials received!")
 	cred := Credentials{}
-	bufArr := [8192]byte{}
+	bufArr := [1024]byte{}
 	buf := bufArr[:]
 	r.Body.Read(buf)
 	err := json.Unmarshal(buf, &cred)

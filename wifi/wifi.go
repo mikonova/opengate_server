@@ -5,8 +5,8 @@ import (
 	"relayesp/boardio"
 	"time"
 
-	"github.com/soypat/lneto/x/netdev"
 	nl "tinygo.org/x/drivers/netlink"
+	"tinygo.org/x/drivers/netlink/probe"
 	"tinygo.org/x/espradio"
 	"tinygo.org/x/espradio/netlink"
 )
@@ -15,21 +15,20 @@ const (
 	Ssid         = "ESP_AP"
 	Pass         = "88888888"
 	ApIP         = "192.168.4.1"
-	LocalNetPort = "5000"
+	LocalNetPort = ":5000"
 )
 
 var (
 	GlobalPort      string = ":10520"
 	isGlobalPortSet bool   = false
-	Link            *netlink.Esplink
+	Link            nl.Netlinker
 )
 
 func LoadStack() {
-	Link = &netlink.Esplink{}
-	netdev.UseNetdev(Link)
+	Link, _ = probe.Probe()
 }
 
-func WifiConnect(wifiName, pass string) (err error, address string) {
+func WifiConnect(wifiName, pass string) (err error) {
 	params := nl.ConnectParams{
 		Ssid:            wifiName,
 		Passphrase:      pass,
@@ -38,19 +37,12 @@ func WifiConnect(wifiName, pass string) (err error, address string) {
 	err = Link.NetConnect(&params)
 	if err != nil {
 		println("Connection error: ", err.Error())
-		return err, ""
+		return err
 	}
 	println("Connected to WIFI")
 	time.Sleep(time.Second * 3)
-	addr, err := Link.Addr()
-	if err != nil {
-		println(err.Error())
-		return err, addr.String()
-	}
 
-	println("local ip is: ", addr.String())
-
-	return nil, addr.String()
+	return nil
 }
 
 func getAskPort(port string) {
@@ -72,7 +64,8 @@ func getAskPort(port string) {
 }
 
 func StartAP() {
-	err := Link.NetConnectAP(netlink.APConnectParams{
+	link := netlink.Esplink{}
+	err := link.NetConnectAP(netlink.APConnectParams{
 		APConfig: espradio.APConfig{
 			SSID:     Ssid,
 			Password: Pass,

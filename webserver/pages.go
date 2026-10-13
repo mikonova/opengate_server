@@ -1,5 +1,6 @@
 package webserver
 
+const TestOk string = "ok"
 const MainPage string = `<!DOCTYPE html>
 <html lang="ru">
 <head>

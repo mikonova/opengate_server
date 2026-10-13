@@ -1,4 +1,4 @@
-//go:build !tests
+//go:build !tests && esp32s3_generic
 
 // sudo tinygo flash -target=esp32s3-generic -serial=usb -panic=print .
 
