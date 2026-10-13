@@ -1,42 +1,34 @@
 //go:build !tests
 
+// sudo tinygo flash -target=esp32s3-generic -serial=usb -panic=print .
+
 package main
 
 import (
 	"machine"
-	"relayesp/boardio"
+	"relayesp/webserver"
 	"relayesp/wifi"
 	"time"
 )
 
 var (
 	key, pass, address string
-	CommChan           chan byte = make(chan byte)
 )
 
 func main() {
 	machine.Serial.Configure(machine.UARTConfig{BaudRate: 115200})
 	time.Sleep(time.Second * 5)
-LOGIN:
-	println("enter wifi SSID")
-	ssid := boardio.GetInput()
-	println("enter wifi password")
-	pass := boardio.GetInput()
-	println("current inputs are: ", ssid, pass)
-	println("proceed (y/n)?[y]")
-	conf := boardio.GetInput()
-	if conf == "n" {
-		goto LOGIN
-	} else {
-		var err error = nil
-		err, address = wifi.WifiConnect(ssid, pass)
-		if err != nil {
-			println("Unable to connect to network")
-			println(err.Error())
-			goto LOGIN
-		}
-	}
-	for {
+	println("[INFO] ESP loaded")
+	wifi.LoadStack()
+	println("[INFO] stack loaded")
+	wifi.StartAP()
+	println("[INFO] AP started!")
+	println("ssid: ", wifi.Ssid, " pass: ", wifi.Pass, "port: ", wifi.LocalNetPort)
+	println("[INFO] ip is ", wifi.ApIP)
+	time.Sleep(time.Second)
+	webserver.InitServer()
 
+	for {
+		time.Sleep(time.Second)
 	}
 }

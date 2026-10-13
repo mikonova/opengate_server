@@ -3,10 +3,9 @@ module relayesp
 go 1.27.1
 
 require (
-	github.com/mikonova/relayproto v1.0.1
+	github.com/mikonova/relayproto v1.0.4
 	github.com/soypat/lneto v0.3.2
+	golang.org/x/net v0.61.0
 	tinygo.org/x/drivers v0.36.0
 	tinygo.org/x/espradio v0.3.0
 )
-
-require golang.org/x/net v0.61.0

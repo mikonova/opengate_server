@@ -1,5 +1,5 @@
-github.com/mikonova/relayproto v1.0.1 h1:oR+jNrq7sAKLhPs8ejf6eZoxfTSQRiVKxH9Cgor9D0c=
-github.com/mikonova/relayproto v1.0.1/go.mod h1:ioWSBwG9AB7qgVhQ7dnKzwE4RcsPJtNLM7DmaRfoJd8=
+github.com/mikonova/relayproto v1.0.4 h1:3WV19c847uJLGPxI2cmRaPfi06N2meUJzCOgKVl0oSQ=
+github.com/mikonova/relayproto v1.0.4/go.mod h1:OA2fqbj6gC1caAw8z4TBuft3/dbqjPHim61S2R0D/RU=
 github.com/soypat/lneto v0.3.2 h1:iUFeRSq2czT7Db6MMOsAnMCBlKCqvIr941zsNf9dcu0=
 github.com/soypat/lneto v0.3.2/go.mod h1:Be5PjwoYukvHFiUXxpYi8+ppH2F/gw/vjGBvFdv+Ti8=
 golang.org/x/net v0.61.0 h1:RR+6j/BTBCrggOLugxa+66R8FvoN6MHlzDlZIbN9YFw=
