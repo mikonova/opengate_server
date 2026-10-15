@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"runtime"
 	"slices"
 	"time"
 
@@ -45,6 +46,8 @@ func StunDial() AddrInfo {
 			println("[WARN] " + "STUN sesponse received!")
 			return addrinfo
 		}
+		runtime.Gosched()
+		runtime.GC()
 	}
 }
 
@@ -87,7 +90,6 @@ func dialingLoop() (info AddrInfo) {
 
 			continue
 		}
-		println("ssdsds", "\n---\n")
 		conn.SetDeadline(time.Now().Add(time.Second * 5))
 		if _, err := conn.Write(outputBuf); err != nil {
 			println("[WARN] writing timeout on server \"", v, "\", switching server")

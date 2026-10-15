@@ -22,8 +22,13 @@ const (
 	deadLine  time.Duration = time.Second * 30
 )
 
+type connectionInfo struct {
+	conn *websocket.Conn
+	id   [16]byte
+}
+
 type connStorage struct {
-	conns       [maxConns]*websocket.Conn
+	conns       [maxConns]*connectionInfo
 	activeConns int
 	mut         sync.RWMutex
 }
@@ -58,7 +63,7 @@ func handler(ws *websocket.Conn) {
 		signatureArr := []byte{42, 34, 204, 149}
 		packetArr := [8192]byte{}
 		packet := packetArr[:]
-		ipBuf := [20]byte{}
+		idBuf := [20]byte{}
 
 		ws.SetReadDeadline(time.Now().Add(deadLine * 2))
 		_, err := ws.Read(packet)
@@ -67,10 +72,10 @@ func handler(ws *websocket.Conn) {
 			ws.Close()
 		}
 
-		t := server.GetIp(packetArr, &ipBuf)
-		ipArr := [16]byte{}
-		sigRecvd := ipBuf[:]
-		copy(sigRecvd, ipBuf[:16])
+		t := server.GetId(packetArr, &idBuf)
+		idArr := [16]byte{}
+		sigRecvd := idBuf[:]
+		copy(sigRecvd, idBuf[:16])
 		switch t {
 		case types.Message:
 			if n := slices.Compare(sigRecvd, signatureArr[:]); n != 0 {
@@ -85,7 +90,7 @@ func handler(ws *websocket.Conn) {
 					ws.Close()
 				}
 			}
-			destConn, err := ConnStorage.GetConn(ipArr)
+			destConn, err := ConnStorage.GetConn(idArr)
 			if err != nil {
 				println(err.Error())
 				var info proto.SignalingPacket
@@ -132,7 +137,7 @@ func (cs *connStorage) AddConn(connHandle *websocket.Conn) {
 	defer cs.mut.Unlock()
 	for i := range maxConns {
 		if cs.conns[i] == nil {
-			cs.conns[i] = connHandle
+			cs.conns[i].conn = connHandle
 			cs.activeConns++
 			return
 		}
@@ -144,7 +149,7 @@ func (cs *connStorage) DelConn(connHandle *websocket.Conn) {
 	cs.mut.Lock()
 	defer cs.mut.Unlock()
 	for i := range maxConns {
-		if connHandle == cs.conns[i] {
+		if connHandle == cs.conns[i].conn {
 			cs.conns[i] = nil
 			cs.activeConns--
 			return
@@ -153,22 +158,22 @@ func (cs *connStorage) DelConn(connHandle *websocket.Conn) {
 	println("connection not in ConnStorage")
 }
 
-func (cs *connStorage) GetConn(ip [16]byte) (*websocket.Conn, error) {
+func (cs *connStorage) GetConn(id [16]byte) (*websocket.Conn, error) {
 	cs.mut.RLock()
 	defer cs.mut.RUnlock()
-	ipSlice := ip[:]
+	ipSlice := id[:]
 
 	for i := range maxConns {
 		if cs.conns[i] == nil {
 			continue
 		}
-		wsaddr, _, err := net.SplitHostPort(cs.conns[i].Request().RemoteAddr)
+		wsaddr, _, err := net.SplitHostPort(cs.conns[i].conn.Request().RemoteAddr)
 		if err != nil {
 			println("[err] malformed address")
 			return nil, err
 		}
 		if wsip := net.ParseIP(wsaddr); wsip.Equal(ipSlice) {
-			return cs.conns[i], nil
+			return cs.conns[i].conn, nil
 		}
 	}
 	return nil, errors.New("[ERR] couldn't find client while searchig")

@@ -11,13 +11,14 @@ func GetInput() string {
 	println("[INFO] waiting input!")
 	for {
 		if machine.Serial.Buffered() == 0 {
+			runtime.Gosched()
 			continue
 		}
 		data, err := machine.Serial.ReadByte()
 		if err != nil {
 			break
 		}
-		if rune(data) == '\n' {
+		if rune(data) == '\n' || rune(data) == '\r' || rune(data) == '\t' {
 			break
 		}
 		buf = append(buf, data)

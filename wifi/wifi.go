@@ -20,7 +20,8 @@ const (
 
 var (
 	GlobalPort      string = ":10520"
-	isGlobalPortSet bool   = false
+	OuterIP         string
+	isGlobalPortSet bool = false
 	Link            *netlink.Esplink
 )
 
@@ -37,10 +38,10 @@ func WifiConnect(wifiName, pass string) (err error, address string) {
 	}
 	err = Link.NetConnect(&params)
 	if err != nil {
-		println("Connection error: ", err.Error())
+		println("[ERR] Connection error: ", err.Error())
 		return err, ""
 	}
-	println("Connected to WIFI")
+	println("[INFO] Connected to WIFI")
 	time.Sleep(time.Second * 3)
 	addr, err := Link.Addr()
 	if err != nil {
@@ -48,7 +49,7 @@ func WifiConnect(wifiName, pass string) (err error, address string) {
 		return err, addr.String()
 	}
 
-	println("local ip is: ", addr.String())
+	println("[INFO] local ip is: ", addr.String())
 
 	return nil, addr.String()
 }

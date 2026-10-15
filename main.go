@@ -4,9 +4,12 @@ package main
 
 import (
 	"machine"
+	"net"
 	"relayesp/boardio"
+	"relayesp/protocol/stun"
 	"relayesp/relay"
 	"relayesp/wifi"
+	"runtime"
 	"time"
 )
 
@@ -22,16 +25,16 @@ func main() {
 	wifi.LoadStack()
 	println("[INFO] stack loaded")
 
-CREDS:
 	ssid, pass := askCreds()
-	err, _ := wifi.WifiConnect(ssid, pass)
-	if err != nil {
-		goto CREDS
-	}
+	wifi.WifiConnect(ssid, pass)
+	addrInfo := stun.StunDial()
+	ip := net.IP(addrInfo.Address[:])
+	println("IMPORTANT: Connection data: ", ip.String(), ", use any forwarded port")
 	relay.CreateHTTP()
 
 	for {
 		time.Sleep(time.Second)
+		runtime.Gosched()
 	}
 }
 
@@ -40,6 +43,7 @@ func askCreds() (string, string) {
 	ssid := boardio.GetInput()
 	println("[INFO] enter network password")
 	pass := boardio.GetInput()
-	println(ssid, " ", pass)
+	println(ssid)
+	println(pass)
 	return ssid, pass
 }

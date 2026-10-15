@@ -1,9 +1,9 @@
-github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 h1:El6M4kTTCOh6aBiKaUGG7oYTSPP8MxqL4YI3kZKwcP4=
-github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510/go.mod h1:pupxD2MaaD3pAXIBCelhxNneeOaAeabZDe5s4K6zSpQ=
 github.com/mikonova/relayproto v1.0.4 h1:3WV19c847uJLGPxI2cmRaPfi06N2meUJzCOgKVl0oSQ=
 github.com/mikonova/relayproto v1.0.4/go.mod h1:OA2fqbj6gC1caAw8z4TBuft3/dbqjPHim61S2R0D/RU=
-github.com/soypat/lneto v0.4.0 h1:oBTcMnhEIBERXmAfwK4uDpItRaF7RiT1K2pljFVxtQc=
-github.com/soypat/lneto v0.4.0/go.mod h1:Be5PjwoYukvHFiUXxpYi8+ppH2F/gw/vjGBvFdv+Ti8=
+github.com/mikonova/relayproto v1.1.0 h1:4CLxPOeQRd2VFTS2FYJ+t7ghoaF/rujpO+2LIJIyiWU=
+github.com/mikonova/relayproto v1.1.0/go.mod h1:OA2fqbj6gC1caAw8z4TBuft3/dbqjPHim61S2R0D/RU=
+github.com/soypat/lneto v0.3.2 h1:iUFeRSq2czT7Db6MMOsAnMCBlKCqvIr941zsNf9dcu0=
+github.com/soypat/lneto v0.3.2/go.mod h1:Be5PjwoYukvHFiUXxpYi8+ppH2F/gw/vjGBvFdv+Ti8=
 golang.org/x/net v0.61.0 h1:RR+6j/BTBCrggOLugxa+66R8FvoN6MHlzDlZIbN9YFw=
 golang.org/x/net v0.61.0/go.mod h1:WgDCOTH8iwtB66T4/GfI94AHo/hhdb7Hah9NDseQfiI=
 tinygo.org/x/drivers v0.36.0 h1:F0x342A6GWqh6abtCa57uAxCyz/b9MbGzvIVvIf+gpE=
