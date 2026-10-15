@@ -32,9 +32,9 @@ var (
 	ConnStorage connStorage = connStorage{}
 )
 
-func Listen() {
+func CreateHTTP() {
 	mux := http.NewServeMux()
-	mux.Handle("/ws", websocket.Handler(handler))
+	mux.Handle("/ws/", websocket.Handler(handler))
 	err := http.ListenAndServe(wifi.GlobalPort, mux)
 	if err != nil {
 		println("[ERR] error creating a websocket listener")

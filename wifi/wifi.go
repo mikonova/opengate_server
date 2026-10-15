@@ -15,7 +15,7 @@ const (
 	Ssid         = "ESP_AP"
 	Pass         = "88888888"
 	ApIP         = "192.168.4.1"
-	LocalNetPort = ":5000"
+	LocalNetPort = "5000"
 )
 
 var (

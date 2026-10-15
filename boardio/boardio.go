@@ -2,19 +2,27 @@ package boardio
 
 import (
 	"machine"
+	"runtime"
 )
 
-func GetInput() (output string) {
+func GetInput() string {
+	buffer := [96]byte{}
+	buf := buffer[0:0]
+	println("[INFO] waiting input!")
 	for {
-		data, err := machine.Serial.ReadByte()
-		if err != nil {
+		if machine.Serial.Buffered() == 0 {
 			continue
 		}
-		if data == '\n' {
+		data, err := machine.Serial.ReadByte()
+		if err != nil {
 			break
-		} else {
-			output += string(data)
 		}
+		if rune(data) == '\n' {
+			break
+		}
+		buf = append(buf, data)
+		runtime.Gosched()
 	}
+	output := string(buf)
 	return output
 }
