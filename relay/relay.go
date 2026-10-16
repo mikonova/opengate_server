@@ -179,6 +179,15 @@ func (cs *connStorage) GetConn(id [16]byte) (*websocket.Conn, error) {
 	return nil, errors.New("[ERR] couldn't find client while searchig")
 }
 
+func (cs *connStorage) IsUnique(id [16]byte) bool {
+	for _, v := range cs.conns {
+		if v.id == id {
+			return false
+		}
+	}
+	return true
+}
+
 func (cs *connStorage) GetActiveConns() int {
 	cs.mut.RLock()
 	defer cs.mut.RLock()
