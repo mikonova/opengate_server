@@ -2,10 +2,9 @@ package relay
 
 import (
 	"errors"
-	"net"
 	"net/http"
 	"relayesp/wifi"
-	"slices"
+	"runtime"
 	"sync"
 	"time"
 
@@ -22,15 +21,15 @@ const (
 	deadLine  time.Duration = time.Second * 30
 )
 
-type connectionInfo struct {
-	conn *websocket.Conn
-	id   [16]byte
-}
-
 type connStorage struct {
-	conns       [maxConns]*connectionInfo
+	conns       [maxConns]connInfo
 	activeConns int
 	mut         sync.RWMutex
+}
+
+type connInfo struct {
+	conn *websocket.Conn
+	id   [16]byte
 }
 
 var (
@@ -58,91 +57,161 @@ func handler(ws *websocket.Conn) {
 			}
 			ws.Close()
 			return
-		}
-		ConnStorage.AddConn(ws)
-		signatureArr := []byte{42, 34, 204, 149}
-		packetArr := [8192]byte{}
-		packet := packetArr[:]
-		idBuf := [20]byte{}
+		} else {
+			var s proto.SignalingPacket
+			packet := s.Encode(types.ServerHello)
 
-		ws.SetReadDeadline(time.Now().Add(deadLine * 2))
-		_, err := ws.Read(packet)
-		if err != nil {
-			println("[INFO] client timed out ")
-			ws.Close()
-		}
-
-		t := server.GetId(packetArr, &idBuf)
-		idArr := [16]byte{}
-		sigRecvd := idBuf[:]
-		copy(sigRecvd, idBuf[:16])
-		switch t {
-		case types.Message:
-			if n := slices.Compare(sigRecvd, signatureArr[:]); n != 0 {
-				println("[WARN] possible data fragmentation from client ")
-				var s proto.SignalingPacket
-				packet := s.Encode(types.OnReceiveFail)
+			for try := range 3 {
 				ws.SetWriteDeadline(time.Now().Add(deadLine))
 				_, err := ws.Write(packet[:])
 				if err != nil {
-					println("[INFO] client is unreachable")
-					ConnStorage.DelConn(ws)
-					ws.Close()
-				}
-			}
-			destConn, err := ConnStorage.GetConn(idArr)
-			if err != nil {
-				println(err.Error())
-				var info proto.SignalingPacket
-				packet := info.Encode(types.RelayError)
-				ws.SetWriteDeadline(time.Now().Add(deadLine))
-				_, err := ws.Write(packet[:])
-				if err != nil {
-					println("[INFO] client is unreachable")
-					ConnStorage.DelConn(ws)
-					ws.Close()
-				}
-			} else {
-				destConn.SetWriteDeadline(time.Now().Add(deadLine))
-				_, err := destConn.Write(packet)
-				if err != nil {
-					println("[INFO] target client timed out")
-					ConnStorage.DelConn(destConn)
-					destConn.Close()
-				}
-			}
-		case types.ClientHello:
-			for tries := range 5 {
-				var sig proto.SignalingPacket
-				packet := sig.Encode(types.ServerHello)
-				ws.SetWriteDeadline(time.Now().Add(deadLine))
-				_, err := ws.Write(packet[:])
-				if err != nil && tries == 3 {
-					println("[INFO] client not responding")
-					ws.Close()
-
-				}
-				if err != nil {
-					println("[INFO] timeout, retrying")
 					continue
 				}
+				if err != nil && try >= 2 {
+					ws.Close()
+					println("[WARN] client timed out")
+					return
+				}
+
+				break
 			}
 		}
+
+		packet := [8192]byte{}
+		ws.SetReadDeadline(time.Now().Add(deadLine * 2))
+		_, err := ws.Read(packet[:])
+		if err != nil {
+			ws.Close()
+			println("[WARN] server timed out")
+			return
+		}
+		t := server.GetType(packet)
+		if t != types.IdCarrier && !ConnStorage.GetConnByHandle(ws) {
+			ws.Close()
+			return
+		}
+		switch t {
+
+		case types.IdCarrier:
+			idSig := [20]byte{}
+			server.GetId(packet, &idSig)
+			idArr := [16]byte{}
+			id := idArr[:]
+			copy(id, idSig[:])
+
+			_, err = ConnStorage.GetConn(idArr)
+			if err != nil {
+				println("[INFO] arrived client w/ invalid ID")
+				var s proto.SignalingPacket
+				packet := s.Encode(types.ServerInternalError)
+
+				for try := range 3 {
+					ws.SetWriteDeadline(time.Now().Add(deadLine))
+					_, err = ws.Write(packet[:])
+					if err != nil {
+						continue
+					}
+					if err != nil && try >= 2 {
+						println("[WARN] couldn't tell the client about invalid ID")
+						ws.Close()
+						return
+					}
+
+					break
+				}
+
+			} else {
+				var s proto.SignalingPacket
+				packet := s.Encode(types.ServerHello)
+
+				for try := range 3 {
+					ws.SetWriteDeadline(time.Now().Add(deadLine))
+					_, err = ws.Write(packet[:])
+					if err != nil {
+						continue
+					}
+					if err != nil && try >= 2 {
+						ws.Close()
+						println("[WARN] client timed out")
+						return
+					}
+
+					break
+				}
+				ConnStorage.AddConn(ws, idArr)
+			}
+
+		case types.ClientHello:
+			var s proto.SignalingPacket
+			packet := s.Encode(types.ServerHello)
+
+			for try := range 3 {
+				ws.SetWriteDeadline(time.Now().Add(deadLine))
+				_, err = ws.Write(packet[:])
+				if err != nil {
+					continue
+				}
+				if err != nil && try >= 2 {
+					ws.Close()
+					println("[WARN] client timed out")
+					return
+				}
+
+				break
+			}
+		case types.Message:
+
+			idSig := [20]byte{}
+			server.GetId(packet, &idSig)
+			idArr := [16]byte{}
+			id := idArr[:]
+			copy(id, idSig[:])
+
+			wsOther, err := ConnStorage.GetConn(idArr)
+			if err != nil {
+				println("[INFO] arrived client w/ invalid ID")
+				var s proto.SignalingPacket
+				packet := s.Encode(types.ServerInternalError)
+
+				for try := range 3 {
+					ws.SetWriteDeadline(time.Now().Add(deadLine))
+					_, err = ws.Write(packet[:])
+					if err != nil {
+						continue
+					}
+					if err != nil && try >= 2 {
+						println("[WARN] couldn't tell the client about invalid ID")
+						ws.Close()
+						return
+					}
+
+					break
+				}
+
+			} else {
+				wsOther.SetWriteDeadline(time.Now().Add(deadLine))
+				wsOther.Write()
+			}
+		}
+
+		// ConnStorage.AddConn(ws)
+		runtime.Gosched()
 	}
 
 }
 
-func (cs *connStorage) AddConn(connHandle *websocket.Conn) {
+func (cs *connStorage) AddConn(connHandle *websocket.Conn, id [16]byte) {
 	cs.mut.Lock()
 	defer cs.mut.Unlock()
 	for i := range maxConns {
-		if cs.conns[i] == nil {
+		if cs.conns[i].conn == nil {
 			cs.conns[i].conn = connHandle
+			cs.conns[i].id = id
 			cs.activeConns++
 			return
 		}
 	}
-	println("[Err] reached max connections capacity")
+	println("[WARN] reached max connections capacity")
 }
 
 func (cs *connStorage) DelConn(connHandle *websocket.Conn) {
@@ -150,42 +219,39 @@ func (cs *connStorage) DelConn(connHandle *websocket.Conn) {
 	defer cs.mut.Unlock()
 	for i := range maxConns {
 		if connHandle == cs.conns[i].conn {
-			cs.conns[i] = nil
+			cs.conns[i].conn = nil
+			cs.conns[i].id = [16]byte{}
 			cs.activeConns--
 			return
 		}
 	}
-	println("connection not in ConnStorage")
+	println("[WARN] connection not in ConnStorage")
+}
+
+func (cs *connStorage) GetConnByHandle(ws *websocket.Conn) bool {
+	cs.mut.RLock()
+	defer cs.mut.RUnlock()
+	for i := range maxConns {
+		if ws == cs.conns[i].conn {
+			return true
+		}
+	}
+	return false
 }
 
 func (cs *connStorage) GetConn(id [16]byte) (*websocket.Conn, error) {
 	cs.mut.RLock()
 	defer cs.mut.RUnlock()
-	ipSlice := id[:]
 
 	for i := range maxConns {
-		if cs.conns[i] == nil {
+		if cs.conns[i].conn == nil {
 			continue
 		}
-		wsaddr, _, err := net.SplitHostPort(cs.conns[i].conn.Request().RemoteAddr)
-		if err != nil {
-			println("[err] malformed address")
-			return nil, err
-		}
-		if wsip := net.ParseIP(wsaddr); wsip.Equal(ipSlice) {
+		if cs.conns[i].id == id {
 			return cs.conns[i].conn, nil
 		}
 	}
-	return nil, errors.New("[ERR] couldn't find client while searchig")
-}
-
-func (cs *connStorage) IsUnique(id [16]byte) bool {
-	for _, v := range cs.conns {
-		if v.id == id {
-			return false
-		}
-	}
-	return true
+	return nil, errors.New("[WARN] couldn't find client while searchig")
 }
 
 func (cs *connStorage) GetActiveConns() int {
