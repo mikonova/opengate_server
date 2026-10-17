@@ -60,21 +60,14 @@ func handler(ws *websocket.Conn) {
 		} else {
 			var s proto.SignalingPacket
 			packet := s.Encode(types.ServerHello)
-
-			for try := range 3 {
-				ws.SetWriteDeadline(time.Now().Add(deadLine))
-				_, err := ws.Write(packet[:])
-				if err != nil {
-					continue
-				}
-				if err != nil && try >= 2 {
-					ws.Close()
-					println("[WARN] client timed out")
-					return
-				}
-
-				break
+			ws.SetWriteDeadline(time.Now().Add(deadLine))
+			_, err := ws.Write(packet[:])
+			if err != nil {
+				ws.Close()
+				println("[WARN] client timed out")
+				return
 			}
+
 		}
 
 		packet := [8192]byte{}
@@ -82,9 +75,10 @@ func handler(ws *websocket.Conn) {
 		_, err := ws.Read(packet[:])
 		if err != nil {
 			ws.Close()
-			println("[WARN] server timed out")
+			println("[WARN] client timed out")
 			return
 		}
+		runtime.Gosched()
 		t := server.GetType(packet)
 		if t != types.IdCarrier && !ConnStorage.GetConnByHandle(ws) {
 			ws.Close()
@@ -104,39 +98,23 @@ func handler(ws *websocket.Conn) {
 				println("[INFO] arrived client w/ invalid ID")
 				var s proto.SignalingPacket
 				packet := s.Encode(types.ServerInternalError)
-
-				for try := range 3 {
-					ws.SetWriteDeadline(time.Now().Add(deadLine))
-					_, err = ws.Write(packet[:])
-					if err != nil {
-						continue
-					}
-					if err != nil && try >= 2 {
-						println("[WARN] couldn't tell the client about invalid ID")
-						ws.Close()
-						return
-					}
-
-					break
+				ws.SetWriteDeadline(time.Now().Add(deadLine))
+				_, err = ws.Write(packet[:])
+				if err != nil {
+					println("[WARN] client timed out")
+					ws.Close()
+					return
 				}
 
 			} else {
 				var s proto.SignalingPacket
 				packet := s.Encode(types.ServerHello)
-
-				for try := range 3 {
-					ws.SetWriteDeadline(time.Now().Add(deadLine))
-					_, err = ws.Write(packet[:])
-					if err != nil {
-						continue
-					}
-					if err != nil && try >= 2 {
-						ws.Close()
-						println("[WARN] client timed out")
-						return
-					}
-
-					break
+				ws.SetWriteDeadline(time.Now().Add(deadLine))
+				_, err = ws.Write(packet[:])
+				if err != nil {
+					ws.Close()
+					println("[WARN] client timed out")
+					return
 				}
 				ConnStorage.AddConn(ws, idArr)
 			}
@@ -144,21 +122,14 @@ func handler(ws *websocket.Conn) {
 		case types.ClientHello:
 			var s proto.SignalingPacket
 			packet := s.Encode(types.ServerHello)
-
-			for try := range 3 {
-				ws.SetWriteDeadline(time.Now().Add(deadLine))
-				_, err = ws.Write(packet[:])
-				if err != nil {
-					continue
-				}
-				if err != nil && try >= 2 {
-					ws.Close()
-					println("[WARN] client timed out")
-					return
-				}
-
-				break
+			ws.SetWriteDeadline(time.Now().Add(deadLine))
+			_, err = ws.Write(packet[:])
+			if err != nil {
+				closeConn(ws)
+				println("[WARN] client timed out")
+				return
 			}
+
 		case types.Message:
 
 			idSig := [20]byte{}
@@ -172,32 +143,45 @@ func handler(ws *websocket.Conn) {
 				println("[INFO] arrived client w/ invalid ID")
 				var s proto.SignalingPacket
 				packet := s.Encode(types.ServerInternalError)
-
-				for try := range 3 {
-					ws.SetWriteDeadline(time.Now().Add(deadLine))
-					_, err = ws.Write(packet[:])
-					if err != nil {
-						continue
-					}
-					if err != nil && try >= 2 {
-						println("[WARN] couldn't tell the client about invalid ID")
-						ws.Close()
-						return
-					}
-
-					break
+				ws.SetWriteDeadline(time.Now().Add(deadLine))
+				_, err = ws.Write(packet[:])
+				if err != nil {
+					println("[WARN] couldn't tell the client about invalid ID")
+					closeConn(ws)
+					return
 				}
 
 			} else {
-				wsOther.SetWriteDeadline(time.Now().Add(deadLine))
-				wsOther.Write()
+				for try := range 3 {
+					wsOther.SetWriteDeadline(time.Now().Add(deadLine))
+					_, err = wsOther.Write(packet[:])
+					if err != nil && try >= 2 {
+						var s proto.SignalingPacket
+						p := s.Encode(types.RelayError)
+						_, err = ws.Write(p[:])
+						if err != nil {
+							println("[WARN] both communicating clients timed out")
+							closeConn(ws)
+							closeConn(wsOther)
+						} else {
+							closeConn(wsOther)
+						}
+					}
+				}
 			}
+		default:
+			runtime.Gosched()
+			continue
 		}
 
-		// ConnStorage.AddConn(ws)
 		runtime.Gosched()
 	}
 
+}
+
+func closeConn(conn *websocket.Conn) {
+	conn.Close()
+	ConnStorage.DelConn(conn)
 }
 
 func (cs *connStorage) AddConn(connHandle *websocket.Conn, id [16]byte) {
